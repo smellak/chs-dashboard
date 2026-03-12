@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --chs-bg: #F8FAFC;
+  --chs-surface: #FFFFFF;
+  --chs-border: #E2E8F0;
+  --chs-border-light: #F1F5F9;
+  --chs-text-primary: #0F172A;
+  --chs-text-secondary: #64748B;
+  --chs-text-muted: #94A3B8;
+  --chs-accent: #2563EB;
+  --chs-accent-dark: #1E3A5F;
+  --chs-accent-light: #EFF6FF;
+  --chs-success: #16A34A;
+  --chs-success-light: #DCFCE7;
+  --chs-error: #DC2626;
+  --chs-error-light: #FEE2E2;
+  --chs-warning: #F59E0B;
+  --chs-warning-light: #FEF3C7;
+  --chs-cat-muebles: #2563EB;
+  --chs-cat-muebles-light: #EFF6FF;
+  --chs-cat-electro: #0891B2;
+  --chs-cat-electro-light: #ECFEFF;
+  --chs-cat-cocinas: #8B5CF6;
+  --chs-cat-cocinas-light: #F5F3FF;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-chs-bg: var(--chs-bg);
+  --color-chs-surface: var(--chs-surface);
+  --color-chs-border: var(--chs-border);
+  --color-chs-border-light: var(--chs-border-light);
+  --color-chs-text-primary: var(--chs-text-primary);
+  --color-chs-text-secondary: var(--chs-text-secondary);
+  --color-chs-text-muted: var(--chs-text-muted);
+  --color-chs-accent: var(--chs-accent);
+  --color-chs-accent-dark: var(--chs-accent-dark);
+  --color-chs-accent-light: var(--chs-accent-light);
+  --color-chs-success: var(--chs-success);
+  --color-chs-success-light: var(--chs-success-light);
+  --color-chs-error: var(--chs-error);
+  --color-chs-error-light: var(--chs-error-light);
+  --color-chs-warning: var(--chs-warning);
+  --color-chs-warning-light: var(--chs-warning-light);
+  --font-sans: "Outfit", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--chs-bg);
+  color: var(--chs-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.kpi-value {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.label-upper {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--chs-text-muted);
 }
