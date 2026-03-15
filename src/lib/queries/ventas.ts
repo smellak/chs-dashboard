@@ -411,7 +411,7 @@ export async function getDatosCanales(desde: string, hasta: string): Promise<Dat
     FROM direccion.cuadro_mando
     WHERE fecha BETWEEN ${desde} AND ${hasta}
       AND categoria != 'anticipos'
-      AND tienda = ANY(${digitales})
+      AND tienda IN (${sql.join(digitales.map(d => sql`${d}`), sql`, `)})
     GROUP BY tienda
     ORDER BY SUM(venta) DESC
   `);
@@ -426,7 +426,7 @@ export async function getDatosCanales(desde: string, hasta: string): Promise<Dat
     FROM direccion.cuadro_mando
     WHERE fecha BETWEEN ${ant.desde} AND ${ant.hasta}
       AND categoria != 'anticipos'
-      AND tienda = ANY(${digitales})
+      AND tienda IN (${sql.join(digitales.map(d => sql`${d}`), sql`, `)})
     GROUP BY tienda
   `);
 
@@ -468,7 +468,7 @@ export async function getHeatmapData(desde: string, hasta: string): Promise<Heat
     FROM direccion.cuadro_mando
     WHERE fecha BETWEEN ${desde} AND ${hasta}
       AND categoria != 'anticipos'
-      AND tienda = ANY(${fisicas})
+      AND tienda IN (${sql.join(fisicas.map(f => sql`${f}`), sql`, `)})
     GROUP BY tienda, categoria
     ORDER BY tienda, categoria
   `);
