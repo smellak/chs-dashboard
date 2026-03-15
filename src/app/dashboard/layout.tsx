@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { getCHSUser } from "@/lib/auth";
+import { getLatestPeriod } from "@/lib/queries/ventas";
 
 export default async function DashboardLayout({
   children,
@@ -8,10 +9,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getCHSUser();
-
-  // Default period - in production this would come from URL params or user preference
-  const anio = 2025;
-  const mes = 7;
+  const { anio, mes } = await getLatestPeriod();
 
   return (
     <div className="flex min-h-screen bg-[var(--chs-bg)]">

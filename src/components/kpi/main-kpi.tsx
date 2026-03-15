@@ -4,9 +4,9 @@ interface MainKPIProps {
   label: string;
   value: string;
   pctTarget: number;
-  target: string;
+  target?: string;
   previous: string;
-  trendTarget: number;
+  trendTarget?: number;
   trendPrevious: number;
 }
 
@@ -19,23 +19,38 @@ export function MainKPI({
   trendTarget,
   trendPrevious,
 }: MainKPIProps) {
+  const hasTarget = target !== undefined && trendTarget !== undefined;
+
   return (
     <div className="rounded-xl border border-[var(--chs-border)] bg-white p-6 shadow-sm">
       <div className="label-upper mb-4">{label}</div>
       <div className="flex items-center gap-6">
-        <RadialGauge value={pctTarget} size={120} />
+        {hasTarget ? (
+          <RadialGauge value={pctTarget} size={120} />
+        ) : (
+          <div className="flex h-[120px] w-[120px] items-center justify-center">
+            <div className="text-center">
+              <div className="kpi-value text-2xl tabular-nums text-[var(--chs-accent)]">
+                {trendPrevious >= 0 ? "+" : ""}{trendPrevious.toFixed(1).replace(".", ",")}%
+              </div>
+              <div className="text-[10px] text-[var(--chs-text-muted)] mt-1">vs año ant.</div>
+            </div>
+          </div>
+        )}
         <div className="flex-1">
           <div className="kpi-value text-3xl text-[var(--chs-text-primary)] tabular-nums">
             {value}
           </div>
           <div className="mt-3 space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-[var(--chs-text-muted)]">Objetivo</span>
-              <div className="flex items-center gap-2">
-                <span className="tabular-nums text-[var(--chs-text-secondary)]">{target}</span>
-                <DevPill value={trendTarget} />
+            {hasTarget && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-[var(--chs-text-muted)]">Objetivo</span>
+                <div className="flex items-center gap-2">
+                  <span className="tabular-nums text-[var(--chs-text-secondary)]">{target}</span>
+                  <DevPill value={trendTarget} />
+                </div>
               </div>
-            </div>
+            )}
             <div className="flex items-center justify-between text-sm">
               <span className="text-[var(--chs-text-muted)]">Año ant.</span>
               <div className="flex items-center gap-2">

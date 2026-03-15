@@ -1,4 +1,4 @@
-import { getDatosCanales } from "@/lib/queries/ventas";
+import { getDatosCanales, getLatestPeriod } from "@/lib/queries/ventas";
 import { fmtK, fmtEur, pct } from "@/lib/format";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { KPICard } from "@/components/kpi/kpi-card";
@@ -8,29 +8,36 @@ import { Globe, ShoppingBag, Store, Package } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const ANIO = 2025;
-const MES = 7;
-
 const CHANNEL_COLORS: Record<string, string> = {
   chs_web: "#2563EB",
   shiito_es: "#8B5CF6",
-  shiito_pt: "#0891B2",
-  marketplaces: "#F59E0B",
+  amazon: "#FF9900",
+  kibuc: "#0891B2",
+  leroy_merlin: "#16A34A",
+  media_markt: "#DC2626",
+  carrefour: "#1E40AF",
+  worten: "#F59E0B",
 };
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   chs_web: <Globe size={16} />,
   shiito_es: <Store size={16} />,
-  shiito_pt: <Store size={16} />,
-  marketplaces: <Package size={16} />,
+  amazon: <Package size={16} />,
+  kibuc: <Store size={16} />,
+  leroy_merlin: <Store size={16} />,
+  media_markt: <Store size={16} />,
+  carrefour: <Store size={16} />,
+  worten: <Store size={16} />,
 };
 
 export default async function EcommercePage() {
-  const canales = await getDatosCanales(ANIO, MES);
+  const { anio, mes } = await getLatestPeriod();
+  const canales = await getDatosCanales(anio, mes);
 
   const totalReal = canales.reduce((sum, c) => sum + c.ventasReal, 0);
   const totalObj = canales.reduce((sum, c) => sum + c.ventasObjetivo, 0);
   const totalAnt = canales.reduce((sum, c) => sum + c.ventasAnterior, 0);
+  const hasObjetivos = totalObj > 0;
 
   return (
     <div className="space-y-6">
@@ -51,20 +58,20 @@ export default async function EcommercePage() {
         <KPICard
           label="Total E-Commerce"
           value={fmtEur(totalReal)}
-          sub={`Obj: ${fmtK(totalObj)} €`}
-          trend={totalObj > 0 ? ((totalReal / totalObj) * 100) - 100 : 0}
+          sub={hasObjetivos ? `Obj: ${fmtK(totalObj)} €` : `Año ant: ${fmtK(totalAnt)} €`}
+          trend={hasObjetivos ? ((totalReal / totalObj) * 100) - 100 : (totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : 0)}
           icon={<ShoppingBag size={16} />}
         />
         <KPICard
-          label="vs Objetivo"
-          value={pct(totalObj > 0 ? (totalReal / totalObj) * 100 : 0)}
-          sub="cumplimiento total"
+          label={hasObjetivos ? "vs Objetivo" : "Canales Activos"}
+          value={hasObjetivos ? pct((totalReal / totalObj) * 100) : String(canales.filter(c => c.ventasReal > 0).length)}
+          sub={hasObjetivos ? "cumplimiento total" : "con ventas este mes"}
         />
         <KPICard
           label="vs Año Anterior"
           value={fmtEur(totalReal - totalAnt)}
           trend={totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : 0}
-          sub={`${fmtK(totalAnt)} € en ${ANIO - 1}`}
+          sub={`${fmtK(totalAnt)} € en ${anio - 1}`}
         />
       </div>
 
@@ -80,7 +87,7 @@ export default async function EcommercePage() {
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-white"
                 style={{ backgroundColor: CHANNEL_COLORS[canal.codigo] || "#94A3B8" }}
               >
-                {CHANNEL_ICONS[canal.codigo]}
+                {CHANNEL_ICONS[canal.codigo] || <Package size={16} />}
               </span>
               <span className="text-sm font-semibold text-[var(--chs-text-primary)]">
                 {canal.nombre}
@@ -91,16 +98,20 @@ export default async function EcommercePage() {
               {fmtEur(canal.ventasReal)}
             </div>
 
-            <ProgressBar
-              value={canal.ventasReal}
-              max={canal.ventasObjetivo}
-              color={CHANNEL_COLORS[canal.codigo]}
-            />
+            {canal.ventasObjetivo > 0 && (
+              <ProgressBar
+                value={canal.ventasReal}
+                max={canal.ventasObjetivo}
+                color={CHANNEL_COLORS[canal.codigo]}
+              />
+            )}
 
-            <div className="mt-3 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
-              <span>Obj: {fmtK(canal.ventasObjetivo)} €</span>
-              <DevPill value={canal.pctObjetivo - 100} />
-            </div>
+            {canal.ventasObjetivo > 0 && (
+              <div className="mt-3 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
+                <span>Obj: {fmtK(canal.ventasObjetivo)} €</span>
+                <DevPill value={canal.pctObjetivo - 100} />
+              </div>
+            )}
 
             <div className="mt-1 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
               <span>Año ant: {fmtK(canal.ventasAnterior)} €</span>

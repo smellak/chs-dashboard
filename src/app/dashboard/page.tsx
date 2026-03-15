@@ -1,4 +1,4 @@
-import { getResumenEmpresa, getDatosCategorias, getDatosTiendas, getHeatmapData } from "@/lib/queries/ventas";
+import { getResumenEmpresa, getDatosCategorias, getDatosTiendas, getHeatmapData, getLatestPeriod } from "@/lib/queries/ventas";
 import { fmtK, fmtEur, pct } from "@/lib/format";
 import { MainKPI } from "@/components/kpi/main-kpi";
 import { KPICard } from "@/components/kpi/kpi-card";
@@ -10,23 +10,20 @@ import { Euro, TrendingUp, Target, BarChart3 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const ANIO = 2025;
-const MES = 7;
-
 export default async function DashboardPage() {
+  const { anio, mes } = await getLatestPeriod();
+
   const [resumen, categorias, tiendas, heatmapData] = await Promise.all([
-    getResumenEmpresa(ANIO, MES),
-    getDatosCategorias(ANIO, MES),
-    getDatosTiendas(ANIO, MES),
-    getHeatmapData(ANIO, MES),
+    getResumenEmpresa(anio, mes),
+    getDatosCategorias(anio, mes),
+    getDatosTiendas(anio, mes),
+    getHeatmapData(anio, mes),
   ]);
 
-  const tiendasFisicas = tiendas.filter((t) =>
-    ["motril", "juncaril", "almeria", "alban", "antequera"].includes(t.codigo)
-  );
+  const tiendasFisicas = tiendas.filter((t) => t.tipo === "tienda_fisica");
 
   const heatmapTiendas = [...new Set(heatmapData.map((d) => d.tienda))].filter(
-    (t) => ["motril", "juncaril", "almeria", "alban", "antequera"].includes(t)
+    (t) => tiendas.some((s) => s.codigo === t && s.tipo === "tienda_fisica")
   );
   const heatmapCats = [...new Set(heatmapData.map((d) => d.categoria))];
   const tiendaNames: Record<string, string> = {};
@@ -41,17 +38,17 @@ export default async function DashboardPage() {
             label="Ventas Acumuladas"
             value={fmtEur(resumen.ventasReal)}
             pctTarget={resumen.pctObjetivo}
-            target={fmtEur(resumen.ventasObjetivo)}
+            target={resumen.ventasObjetivo > 0 ? fmtEur(resumen.ventasObjetivo) : undefined}
             previous={fmtEur(resumen.ventasAnterior)}
-            trendTarget={resumen.pctObjetivo - 100}
+            trendTarget={resumen.ventasObjetivo > 0 ? resumen.pctObjetivo - 100 : undefined}
             trendPrevious={resumen.pctAnterior}
           />
         </div>
         <KPICard
           label="Margen Bruto"
           value={fmtEur(resumen.margenReal)}
-          sub={`Obj: ${fmtK(resumen.margenObjetivo)} €`}
-          trend={resumen.margenObjetivo > 0 ? ((resumen.margenReal / resumen.margenObjetivo) * 100) - 100 : 0}
+          sub={resumen.margenObjetivo > 0 ? `Obj: ${fmtK(resumen.margenObjetivo)} €` : "Sin objetivo"}
+          trend={resumen.margenObjetivo > 0 ? ((resumen.margenReal / resumen.margenObjetivo) * 100) - 100 : undefined}
           icon={<Euro size={16} />}
         />
         <KPICard
@@ -61,10 +58,10 @@ export default async function DashboardPage() {
           icon={<TrendingUp size={16} />}
         />
         <KPICard
-          label="vs Objetivo"
-          value={pct(resumen.pctObjetivo)}
-          sub={fmtK(resumen.ventasObjetivo) + " € obj."}
-          trend={resumen.pctObjetivo - 100}
+          label={resumen.ventasObjetivo > 0 ? "vs Objetivo" : "vs Año Anterior"}
+          value={resumen.ventasObjetivo > 0 ? pct(resumen.pctObjetivo) : fmtEur(resumen.ventasReal - resumen.ventasAnterior)}
+          sub={resumen.ventasObjetivo > 0 ? `${fmtK(resumen.ventasObjetivo)} € obj.` : `${fmtK(resumen.ventasAnterior)} € en ${anio - 1}`}
+          trend={resumen.ventasObjetivo > 0 ? resumen.pctObjetivo - 100 : resumen.pctAnterior}
           icon={<Target size={16} />}
         />
       </div>
@@ -73,15 +70,17 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div className="flex items-center justify-center">
           <DonutChart
-            segments={categorias.map((c) => ({
-              label: c.nombre,
-              value: c.ventasReal,
-              color: c.color,
-            }))}
+            segments={categorias
+              .filter((c) => c.ventasReal > 0)
+              .map((c) => ({
+                label: c.nombre,
+                value: c.ventasReal,
+                color: c.color,
+              }))}
             size={180}
           />
         </div>
-        {categorias.map((cat) => (
+        {categorias.filter((c) => c.ventasReal !== 0).map((cat) => (
           <CategoryCard
             key={cat.codigo}
             nombre={cat.nombre}

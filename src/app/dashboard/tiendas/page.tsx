@@ -1,4 +1,4 @@
-import { getDatosTiendas } from "@/lib/queries/ventas";
+import { getDatosTiendas, getLatestPeriod } from "@/lib/queries/ventas";
 import { fmtK, pct } from "@/lib/format";
 import { StoreMap } from "@/components/charts/store-map";
 import { StoreTable } from "@/components/data/store-table";
@@ -6,15 +6,11 @@ import { DevPill } from "@/components/data/dev-pill";
 
 export const dynamic = "force-dynamic";
 
-const ANIO = 2025;
-const MES = 7;
-
 export default async function TiendasPage() {
-  const tiendas = await getDatosTiendas(ANIO, MES);
+  const { anio, mes } = await getLatestPeriod();
+  const tiendas = await getDatosTiendas(anio, mes);
 
-  const tiendasFisicas = tiendas.filter(
-    (t) => t.latitud !== null && t.longitud !== null
-  );
+  const tiendasFisicas = tiendas.filter((t) => t.tipo === "tienda_fisica");
 
   const storePoints = tiendasFisicas.map((t) => ({
     codigo: t.codigo,
@@ -45,7 +41,7 @@ export default async function TiendasPage() {
                 <span className="text-sm font-semibold text-[var(--chs-text-primary)]">
                   {t.nombre}
                 </span>
-                <DevPill value={t.pctObjetivo - 100} />
+                {t.ventasObjetivo > 0 && <DevPill value={t.pctObjetivo - 100} />}
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div>
@@ -53,8 +49,12 @@ export default async function TiendasPage() {
                   <div className="text-sm font-semibold tabular-nums">{fmtK(t.ventasReal)} €</div>
                 </div>
                 <div>
-                  <div className="text-[11px] text-[var(--chs-text-muted)]">Objetivo</div>
-                  <div className="text-sm tabular-nums text-[var(--chs-text-secondary)]">{fmtK(t.ventasObjetivo)} €</div>
+                  <div className="text-[11px] text-[var(--chs-text-muted)]">
+                    {t.ventasObjetivo > 0 ? "Objetivo" : "Año Ant."}
+                  </div>
+                  <div className="text-sm tabular-nums text-[var(--chs-text-secondary)]">
+                    {fmtK(t.ventasObjetivo > 0 ? t.ventasObjetivo : t.ventasAnterior)} €
+                  </div>
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--chs-text-muted)]">MB%</div>

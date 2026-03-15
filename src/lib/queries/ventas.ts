@@ -16,6 +16,7 @@ export interface ResumenEmpresa {
 export interface DatosTienda {
   codigo: string;
   nombre: string;
+  tipo: string;
   latitud: number | null;
   longitud: number | null;
   ventasReal: number;
@@ -53,15 +54,26 @@ export interface DatosCanal {
   pctAnterior: number;
 }
 
+/** Returns the most recent (anio, mes) available in erp.ventas_real */
+export async function getLatestPeriod(): Promise<{ anio: number; mes: number }> {
+  const [row] = await db.execute<{ anio: number; mes: number }>(sql`
+    SELECT anio, mes
+    FROM erp.ventas_real
+    ORDER BY anio DESC, mes DESC
+    LIMIT 1
+  `);
+  return row ?? { anio: 2025, mes: 1 };
+}
+
 export async function getResumenEmpresa(anio: number, mes: number): Promise<ResumenEmpresa> {
   const [real] = await db.execute<{
-    ventas_real: string;
-    margen_real: string;
+    venta_neta: string;
+    margen: string;
   }>(sql`
     SELECT
-      COALESCE(ventas_real, 0) as ventas_real,
-      COALESCE(margen_real, 0) as margen_real
-    FROM direccion.historico_anual
+      COALESCE(venta_neta, 0) as venta_neta,
+      COALESCE(margen, 0) as margen
+    FROM erp.ventas_real
     WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
   `);
 
@@ -72,27 +84,27 @@ export async function getResumenEmpresa(anio: number, mes: number): Promise<Resu
     SELECT
       COALESCE(objetivo_ventas, 0) as objetivo_ventas,
       COALESCE(objetivo_margen, 0) as objetivo_margen
-    FROM direccion.objetivos
+    FROM erp.objetivos_direccion
     WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
   `);
 
   const [anterior] = await db.execute<{
-    ventas_real: string;
-    margen_real: string;
+    venta_neta: string;
+    margen: string;
   }>(sql`
     SELECT
-      COALESCE(ventas_real, 0) as ventas_real,
-      COALESCE(margen_real, 0) as margen_real
-    FROM direccion.historico_anual
+      COALESCE(venta_neta, 0) as venta_neta,
+      COALESCE(margen, 0) as margen
+    FROM erp.ventas_real
     WHERE anio = ${anio - 1} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
   `);
 
-  const ventasReal = Number(real?.ventas_real || 0);
-  const margenReal = Number(real?.margen_real || 0);
+  const ventasReal = Number(real?.venta_neta || 0);
+  const margenReal = Number(real?.margen || 0);
   const ventasObjetivo = Number(objetivo?.objetivo_ventas || 0);
   const margenObjetivo = Number(objetivo?.objetivo_margen || 0);
-  const ventasAnterior = Number(anterior?.ventas_real || 0);
-  const margenAnterior = Number(anterior?.margen_real || 0);
+  const ventasAnterior = Number(anterior?.venta_neta || 0);
+  const margenAnterior = Number(anterior?.margen || 0);
 
   return {
     ventasReal,
@@ -111,10 +123,11 @@ export async function getDatosTiendas(anio: number, mes: number): Promise<DatosT
   const rows = await db.execute<{
     codigo: string;
     nombre: string;
+    tipo: string;
     latitud: string | null;
     longitud: string | null;
-    ventas_real: string;
-    margen_real: string;
+    venta_neta: string;
+    margen: string;
     ventas_objetivo: string;
     margen_objetivo: string;
     ventas_anterior: string;
@@ -122,33 +135,35 @@ export async function getDatosTiendas(anio: number, mes: number): Promise<DatosT
     SELECT
       t.codigo,
       t.nombre,
+      t.tipo,
       t.latitud::text,
       t.longitud::text,
-      COALESCE(h.ventas_real, 0) as ventas_real,
-      COALESCE(h.margen_real, 0) as margen_real,
+      COALESCE(v.venta_neta, 0) as venta_neta,
+      COALESCE(v.margen, 0) as margen,
       COALESCE(o.objetivo_ventas, 0) as ventas_objetivo,
       COALESCE(o.objetivo_margen, 0) as margen_objetivo,
-      COALESCE(ha.ventas_real, 0) as ventas_anterior
+      COALESCE(va.venta_neta, 0) as ventas_anterior
     FROM direccion.tiendas t
-    LEFT JOIN direccion.historico_anual h
-      ON h.canal = t.codigo AND h.anio = ${anio} AND h.mes = ${mes} AND h.categoria = 'total'
-    LEFT JOIN direccion.objetivos o
+    LEFT JOIN erp.ventas_real v
+      ON v.canal = t.codigo AND v.anio = ${anio} AND v.mes = ${mes} AND v.categoria = 'total'
+    LEFT JOIN erp.objetivos_direccion o
       ON o.canal = t.codigo AND o.anio = ${anio} AND o.mes = ${mes} AND o.categoria = 'total'
-    LEFT JOIN direccion.historico_anual ha
-      ON ha.canal = t.codigo AND ha.anio = ${anio - 1} AND ha.mes = ${mes} AND ha.categoria = 'total'
-    WHERE t.activa = true
+    LEFT JOIN erp.ventas_real va
+      ON va.canal = t.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes} AND va.categoria = 'total'
+    WHERE t.activa = true AND t.codigo != 'empresa'
     ORDER BY t.orden
   `);
 
   return rows.map((r) => {
-    const ventasReal = Number(r.ventas_real);
-    const margenReal = Number(r.margen_real);
+    const ventasReal = Number(r.venta_neta);
+    const margenReal = Number(r.margen);
     const ventasObjetivo = Number(r.ventas_objetivo);
     const margenObjetivo = Number(r.margen_objetivo);
     const ventasAnterior = Number(r.ventas_anterior);
     return {
       codigo: r.codigo,
       nombre: r.nombre,
+      tipo: r.tipo,
       latitud: r.latitud ? Number(r.latitud) : null,
       longitud: r.longitud ? Number(r.longitud) : null,
       ventasReal,
@@ -170,8 +185,8 @@ export async function getDatosCategorias(anio: number, mes: number): Promise<Dat
     icono: string;
     color: string;
     color_light: string;
-    ventas_real: string;
-    margen_real: string;
+    venta_neta: string;
+    margen: string;
     ventas_objetivo: string;
     margen_objetivo: string;
     ventas_anterior: string;
@@ -182,24 +197,24 @@ export async function getDatosCategorias(anio: number, mes: number): Promise<Dat
       c.icono,
       c.color,
       c.color_light,
-      COALESCE(h.ventas_real, 0) as ventas_real,
-      COALESCE(h.margen_real, 0) as margen_real,
+      COALESCE(v.venta_neta, 0) as venta_neta,
+      COALESCE(v.margen, 0) as margen,
       COALESCE(o.objetivo_ventas, 0) as ventas_objetivo,
       COALESCE(o.objetivo_margen, 0) as margen_objetivo,
-      COALESCE(ha.ventas_real, 0) as ventas_anterior
+      COALESCE(va.venta_neta, 0) as ventas_anterior
     FROM direccion.categorias c
-    LEFT JOIN direccion.historico_anual h
-      ON h.canal = 'empresa' AND h.categoria = c.codigo AND h.anio = ${anio} AND h.mes = ${mes}
-    LEFT JOIN direccion.objetivos o
+    LEFT JOIN erp.ventas_real v
+      ON v.canal = 'empresa' AND v.categoria = c.codigo AND v.anio = ${anio} AND v.mes = ${mes}
+    LEFT JOIN erp.objetivos_direccion o
       ON o.canal = 'empresa' AND o.categoria = c.codigo AND o.anio = ${anio} AND o.mes = ${mes}
-    LEFT JOIN direccion.historico_anual ha
-      ON ha.canal = 'empresa' AND ha.categoria = c.codigo AND ha.anio = ${anio - 1} AND ha.mes = ${mes}
+    LEFT JOIN erp.ventas_real va
+      ON va.canal = 'empresa' AND va.categoria = c.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes}
     ORDER BY c.orden
   `);
 
   return rows.map((r) => {
-    const ventasReal = Number(r.ventas_real);
-    const margenReal = Number(r.margen_real);
+    const ventasReal = Number(r.venta_neta);
+    const margenReal = Number(r.margen);
     const ventasObjetivo = Number(r.ventas_objetivo);
     const margenObjetivo = Number(r.margen_objetivo);
     const ventasAnterior = Number(r.ventas_anterior);
@@ -221,34 +236,32 @@ export async function getDatosCategorias(anio: number, mes: number): Promise<Dat
 }
 
 export async function getDatosCanales(anio: number, mes: number): Promise<DatosCanal[]> {
-  const canalesOnline = ["chs_web", "shiito_es", "shiito_pt", "marketplaces"];
-
   const rows = await db.execute<{
     codigo: string;
     nombre: string;
-    ventas_real: string;
+    venta_neta: string;
     ventas_objetivo: string;
     ventas_anterior: string;
   }>(sql`
     SELECT
       t.codigo,
       t.nombre,
-      COALESCE(h.ventas_real, 0) as ventas_real,
+      COALESCE(v.venta_neta, 0) as venta_neta,
       COALESCE(o.objetivo_ventas, 0) as ventas_objetivo,
-      COALESCE(ha.ventas_real, 0) as ventas_anterior
+      COALESCE(va.venta_neta, 0) as ventas_anterior
     FROM direccion.tiendas t
-    LEFT JOIN direccion.historico_anual h
-      ON h.canal = t.codigo AND h.anio = ${anio} AND h.mes = ${mes} AND h.categoria = 'total'
-    LEFT JOIN direccion.objetivos o
+    LEFT JOIN erp.ventas_real v
+      ON v.canal = t.codigo AND v.anio = ${anio} AND v.mes = ${mes} AND v.categoria = 'total'
+    LEFT JOIN erp.objetivos_direccion o
       ON o.canal = t.codigo AND o.anio = ${anio} AND o.mes = ${mes} AND o.categoria = 'total'
-    LEFT JOIN direccion.historico_anual ha
-      ON ha.canal = t.codigo AND ha.anio = ${anio - 1} AND ha.mes = ${mes} AND ha.categoria = 'total'
-    WHERE t.codigo = ANY(${canalesOnline})
+    LEFT JOIN erp.ventas_real va
+      ON va.canal = t.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes} AND va.categoria = 'total'
+    WHERE t.tipo IN ('ecommerce', 'marketplace')
     ORDER BY t.orden
   `);
 
   return rows.map((r) => {
-    const ventasReal = Number(r.ventas_real);
+    const ventasReal = Number(r.venta_neta);
     const ventasObjetivo = Number(r.ventas_objetivo);
     const ventasAnterior = Number(r.ventas_anterior);
     return {
@@ -270,8 +283,8 @@ export async function getTiendaPorCategoria(anio: number, mes: number, tiendaCod
     icono: string;
     color: string;
     color_light: string;
-    ventas_real: string;
-    margen_real: string;
+    venta_neta: string;
+    margen: string;
     ventas_objetivo: string;
     margen_objetivo: string;
     ventas_anterior: string;
@@ -282,24 +295,24 @@ export async function getTiendaPorCategoria(anio: number, mes: number, tiendaCod
       c.icono,
       c.color,
       c.color_light,
-      COALESCE(h.ventas_real, 0) as ventas_real,
-      COALESCE(h.margen_real, 0) as margen_real,
+      COALESCE(v.venta_neta, 0) as venta_neta,
+      COALESCE(v.margen, 0) as margen,
       COALESCE(o.objetivo_ventas, 0) as ventas_objetivo,
       COALESCE(o.objetivo_margen, 0) as margen_objetivo,
-      COALESCE(ha.ventas_real, 0) as ventas_anterior
+      COALESCE(va.venta_neta, 0) as ventas_anterior
     FROM direccion.categorias c
-    LEFT JOIN direccion.historico_anual h
-      ON h.canal = ${tiendaCodigo} AND h.categoria = c.codigo AND h.anio = ${anio} AND h.mes = ${mes}
-    LEFT JOIN direccion.objetivos o
+    LEFT JOIN erp.ventas_real v
+      ON v.canal = ${tiendaCodigo} AND v.categoria = c.codigo AND v.anio = ${anio} AND v.mes = ${mes}
+    LEFT JOIN erp.objetivos_direccion o
       ON o.canal = ${tiendaCodigo} AND o.categoria = c.codigo AND o.anio = ${anio} AND o.mes = ${mes}
-    LEFT JOIN direccion.historico_anual ha
-      ON ha.canal = ${tiendaCodigo} AND ha.categoria = c.codigo AND ha.anio = ${anio - 1} AND ha.mes = ${mes}
+    LEFT JOIN erp.ventas_real va
+      ON va.canal = ${tiendaCodigo} AND va.categoria = c.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes}
     ORDER BY c.orden
   `);
 
   return rows.map((r) => {
-    const ventasReal = Number(r.ventas_real);
-    const margenReal = Number(r.margen_real);
+    const ventasReal = Number(r.venta_neta);
+    const margenReal = Number(r.margen);
     const ventasObjetivo = Number(r.ventas_objetivo);
     const margenObjetivo = Number(r.margen_objetivo);
     const ventasAnterior = Number(r.ventas_anterior);
@@ -330,25 +343,25 @@ export async function getHeatmapData(anio: number, mes: number): Promise<{
   const rows = await db.execute<{
     tienda: string;
     categoria: string;
-    ventas_real: string;
+    venta_neta: string;
     ventas_objetivo: string;
   }>(sql`
     SELECT
-      h.canal as tienda,
-      h.categoria,
-      COALESCE(h.ventas_real, 0) as ventas_real,
+      v.canal as tienda,
+      v.categoria,
+      COALESCE(v.venta_neta, 0) as venta_neta,
       COALESCE(o.objetivo_ventas, 0) as ventas_objetivo
-    FROM direccion.historico_anual h
-    LEFT JOIN direccion.objetivos o
-      ON o.canal = h.canal AND o.categoria = h.categoria AND o.anio = h.anio AND o.mes = h.mes
-    WHERE h.anio = ${anio} AND h.mes = ${mes}
-      AND h.canal NOT IN ('empresa')
-      AND h.categoria != 'total'
-    ORDER BY h.canal, h.categoria
+    FROM erp.ventas_real v
+    LEFT JOIN erp.objetivos_direccion o
+      ON o.canal = v.canal AND o.categoria = v.categoria AND o.anio = v.anio AND o.mes = v.mes
+    WHERE v.anio = ${anio} AND v.mes = ${mes}
+      AND v.canal != 'empresa'
+      AND v.categoria != 'total'
+    ORDER BY v.canal, v.categoria
   `);
 
   return rows.map((r) => {
-    const ventasReal = Number(r.ventas_real);
+    const ventasReal = Number(r.venta_neta);
     const ventasObjetivo = Number(r.ventas_objetivo);
     return {
       tienda: r.tienda,
