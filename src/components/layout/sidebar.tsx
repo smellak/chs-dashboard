@@ -7,6 +7,7 @@ import {
   MapPin,
   Tags,
   ShoppingCart,
+  PieChart,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -14,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/tiendas", label: "Tiendas", icon: MapPin },
   { href: "/dashboard/categorias", label: "Categorías", icon: Tags },
   { href: "/dashboard/ecommerce", label: "E-Commerce", icon: ShoppingCart },
+  { href: "/dashboard/margenes", label: "Márgenes", icon: PieChart },
 ];
 
 export function Sidebar() {
@@ -21,7 +23,6 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-[232px] flex-col border-r border-[var(--chs-border)] bg-white">
-      {/* Brand */}
       <div className="flex h-16 items-center gap-3 px-5">
         <div
           className="flex h-9 w-9 items-center justify-center rounded-lg text-white font-bold text-sm"
@@ -30,16 +31,10 @@ export function Sidebar() {
           CHS
         </div>
         <div>
-          <div className="text-sm font-semibold text-[var(--chs-text-primary)]">
-            Centro Hogar
-          </div>
-          <div className="text-[11px] text-[var(--chs-text-muted)]">
-            Cuadro de Dirección
-          </div>
+          <div className="text-sm font-semibold text-[var(--chs-text-primary)]">Centro Hogar</div>
+          <div className="text-[11px] text-[var(--chs-text-muted)]">Cuadro de Dirección</div>
         </div>
       </div>
-
-      {/* Navigation */}
       <nav className="mt-4 flex-1 px-3">
         <div className="label-upper mb-2 px-2">Navegación</div>
         {NAV_ITEMS.map((item) => {
@@ -48,7 +43,6 @@ export function Sidebar() {
               ? pathname === "/dashboard"
               : pathname.startsWith(item.href);
           const Icon = item.icon;
-
           return (
             <Link
               key={item.href}
@@ -65,12 +59,8 @@ export function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Footer */}
       <div className="border-t border-[var(--chs-border-light)] p-4">
-        <div className="text-[10px] text-[var(--chs-text-muted)]">
-          CHS Platform v2
-        </div>
+        <div className="text-[10px] text-[var(--chs-text-muted)]">CHS Platform v2</div>
       </div>
     </aside>
   );

@@ -1,21 +1,11 @@
-import { NextRequest } from "next/server";
-import { getDatosCanales, getDefaultPeriod } from "@/lib/queries/ventas";
+import { NextResponse } from "next/server";
+import { getDatosCanales, getDefaultRange } from "@/lib/queries/ventas";
 
-export const dynamic = "force-dynamic";
-
-export async function GET(req: NextRequest) {
-  const params = req.nextUrl.searchParams;
-  const { anio: defaultAnio, mes: defaultMes } = await getDefaultPeriod();
-  const anio = Number(params.get("anio") || defaultAnio);
-  const mes = Number(params.get("mes") || defaultMes);
-
-  try {
-    const canales = await getDatosCanales(anio, mes);
-    const totalReal = canales.reduce((sum, c) => sum + c.ventasReal, 0);
-    const totalObjetivo = canales.reduce((sum, c) => sum + c.ventasObjetivo, 0);
-
-    return Response.json({ anio, mes, canales, totalReal, totalObjetivo });
-  } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Error" }, { status: 500 });
-  }
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const defaults = await getDefaultRange();
+  const desde = searchParams.get("desde") || defaults.desde;
+  const hasta = searchParams.get("hasta") || defaults.hasta;
+  const canales = await getDatosCanales(desde, hasta);
+  return NextResponse.json({ canales });
 }

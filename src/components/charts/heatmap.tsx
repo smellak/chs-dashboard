@@ -2,8 +2,10 @@ interface HeatmapCell {
   tienda: string;
   categoria: string;
   ventasReal: number;
-  ventasObjetivo: number;
-  pctObjetivo: number;
+  margenReal?: number;
+  mbPct?: number;
+  ventasObjetivo?: number;
+  pctObjetivo?: number;
 }
 
 interface HeatmapProps {
@@ -20,21 +22,13 @@ function fmtK(n: number): string {
 }
 
 export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps) {
-  const hasObjetivos = data.some((d) => d.ventasObjetivo > 0);
   const getCell = (tienda: string, cat: string) =>
     data.find((d) => d.tienda === tienda && d.categoria === cat);
 
-  // Calculate max ventas for relative coloring when no objectives
   const maxVentas = Math.max(...data.map((d) => d.ventasReal), 1);
 
   function getCellBg(cell: HeatmapCell | undefined): string {
     if (!cell || cell.ventasReal < 1) return "var(--chs-bg)";
-    if (hasObjetivos) {
-      if (cell.pctObjetivo >= 100) return "var(--chs-success-light)";
-      if (cell.pctObjetivo >= 75) return "#FEF3C7";
-      return "var(--chs-error-light)";
-    }
-    // Relative intensity based on sales
     const intensity = cell.ventasReal / maxVentas;
     if (intensity > 0.5) return "var(--chs-success-light)";
     if (intensity > 0.2) return "var(--chs-accent-light)";
@@ -43,11 +37,6 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
 
   function getCellFg(cell: HeatmapCell | undefined): string {
     if (!cell || cell.ventasReal < 1) return "var(--chs-text-muted)";
-    if (hasObjetivos) {
-      if (cell.pctObjetivo >= 100) return "var(--chs-success)";
-      if (cell.pctObjetivo >= 75) return "var(--chs-warning)";
-      return "var(--chs-error)";
-    }
     const intensity = cell.ventasReal / maxVentas;
     if (intensity > 0.5) return "var(--chs-success)";
     if (intensity > 0.2) return "var(--chs-accent)";
@@ -59,14 +48,9 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-[var(--chs-bg)]">
-            <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">
-              Tienda
-            </th>
+            <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">Tienda</th>
             {categorias.map((cat) => (
-              <th
-                key={cat}
-                className="px-4 py-3 text-center text-xs font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider"
-              >
+              <th key={cat} className="px-4 py-3 text-center text-xs font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">
                 {cat}
               </th>
             ))}
@@ -84,14 +68,9 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
                   <td key={cat} className="px-4 py-3 text-center">
                     <span
                       className="inline-block rounded-md px-3 py-1.5 text-xs font-semibold tabular-nums"
-                      style={{
-                        backgroundColor: getCellBg(cell),
-                        color: getCellFg(cell),
-                      }}
+                      style={{ backgroundColor: getCellBg(cell), color: getCellFg(cell) }}
                     >
-                      {hasObjetivos
-                        ? `${(cell?.pctObjetivo || 0).toFixed(0)}%`
-                        : cell && cell.ventasReal >= 1
+                      {cell && cell.ventasReal >= 1
                         ? `${fmtK(cell.ventasReal)} €`
                         : "—"}
                     </span>

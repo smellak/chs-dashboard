@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { getCHSUser } from "@/lib/auth";
-import { getDefaultPeriod, getAvailablePeriods } from "@/lib/queries/ventas";
+import { getDefaultRange, getPredefinedRanges } from "@/lib/queries/ventas";
 
 export default async function DashboardLayout({
   children,
@@ -10,8 +10,8 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getCHSUser();
-  const { anio, mes } = await getDefaultPeriod();
-  const availablePeriods = await getAvailablePeriods();
+  const defaultRange = await getDefaultRange();
+  const ranges = getPredefinedRanges();
 
   return (
     <div className="flex min-h-screen bg-[var(--chs-bg)]">
@@ -23,9 +23,9 @@ export default async function DashboardLayout({
           </header>
         }>
           <Header
-            defaultAnio={anio}
-            defaultMes={mes}
-            availablePeriods={availablePeriods}
+            defaultDesde={defaultRange.desde}
+            defaultHasta={defaultRange.hasta}
+            ranges={ranges}
             userName={user?.name}
           />
         </Suspense>
