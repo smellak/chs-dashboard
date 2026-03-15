@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MESES } from "@/lib/constants";
+import { Calendar } from "lucide-react";
 
 interface HeaderProps {
   defaultAnio: number;
@@ -31,26 +32,33 @@ export function Header({ defaultAnio, defaultMes, availablePeriods, userName }: 
       className="flex h-16 items-center justify-between px-6"
       style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #2563EB 100%)" }}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
         <h1 className="text-lg font-semibold text-white">
           Cuadro de Dirección
         </h1>
-        <select
-          value={`${anio}-${mes}`}
-          onChange={handlePeriodChange}
-          className="rounded-md bg-white/15 px-2.5 py-1 text-xs font-medium text-white/90 border-none outline-none cursor-pointer hover:bg-white/25 transition-colors appearance-none"
-          style={{ backgroundImage: "none" }}
-        >
-          {availablePeriods.map((p) => (
-            <option
-              key={`${p.anio}-${p.mes}`}
-              value={`${p.anio}-${p.mes}`}
-              className="text-gray-900 bg-white"
-            >
-              {MESES[p.mes - 1]} {p.anio}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1.5 rounded-lg bg-white/20 backdrop-blur px-3 py-1.5">
+          <Calendar size={14} className="text-white/80" />
+          <select
+            value={`${anio}-${mes}`}
+            onChange={handlePeriodChange}
+            className="bg-transparent text-sm font-medium text-white border-none outline-none cursor-pointer appearance-none pr-4"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='white' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 0 center",
+            }}
+          >
+            {availablePeriods.map((p) => (
+              <option
+                key={`${p.anio}-${p.mes}`}
+                value={`${p.anio}-${p.mes}`}
+                className="text-gray-900 bg-white"
+              >
+                {MESES[p.mes - 1]} {p.anio}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       <div className="flex items-center gap-3">
         {userName && (

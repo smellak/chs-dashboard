@@ -2,7 +2,6 @@ import { getDatosCategorias, getHeatmapData, getDatosTiendas, getDefaultPeriod }
 import { CategoryCard } from "@/components/data/category-card";
 import { Heatmap } from "@/components/charts/heatmap";
 import { fmtK } from "@/lib/format";
-import { DevPill } from "@/components/data/dev-pill";
 
 export const dynamic = "force-dynamic";
 
@@ -36,57 +35,66 @@ export default async function CategoriasPage({
     <div className="space-y-6">
       {/* Category cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-4">
-        {activeCats.map((cat) => (
-          <CategoryCard
-            key={cat.codigo}
-            nombre={cat.nombre}
-            icono={cat.icono}
-            color={cat.color}
-            colorLight={cat.colorLight}
-            ventasReal={cat.ventasReal}
-            totalVentas={totalCatVentas}
-          />
-        ))}
+        {activeCats
+          .sort((a, b) => b.ventasReal - a.ventasReal)
+          .map((cat) => (
+            <CategoryCard
+              key={cat.codigo}
+              nombre={cat.nombre}
+              icono={cat.icono}
+              color={cat.color}
+              colorLight={cat.colorLight}
+              ventasReal={cat.ventasReal}
+              totalVentas={totalCatVentas}
+            />
+          ))}
       </div>
 
       {/* Detail table per category */}
-      {activeCats.map((cat) => {
-        const catHeatmap = heatmapData.filter((d) => d.categoria === cat.codigo);
-        const catHasAnterior = cat.ventasAnterior > 0;
-        return (
-          <div key={cat.codigo} className="rounded-xl border border-[var(--chs-border)] bg-white shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--chs-border-light)]">
-              <span className="text-lg">{cat.icono}</span>
-              <h3 className="text-sm font-semibold text-[var(--chs-text-primary)]">{cat.nombre}</h3>
-              <span className="ml-auto text-sm font-semibold tabular-nums" style={{ color: cat.color }}>
-                {fmtK(cat.ventasReal)} €
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--chs-bg)]">
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">Tienda</th>
-                    <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">Ventas</th>
-                    <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">% del Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catHeatmap.map((row) => (
-                    <tr key={row.tienda} className="border-t border-[var(--chs-border-light)]">
-                      <td className="px-4 py-2.5 font-medium">{tiendaNames[row.tienda] || row.tienda}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtK(row.ventasReal)} €</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-[var(--chs-text-muted)]">
-                        {cat.ventasReal > 0 ? ((row.ventasReal / cat.ventasReal) * 100).toFixed(1).replace(".", ",") : "0,0"}%
-                      </td>
+      {activeCats
+        .sort((a, b) => b.ventasReal - a.ventasReal)
+        .map((cat) => {
+          // Filter out negative/zero values from detail rows
+          const catRows = heatmapData
+            .filter((d) => d.categoria === cat.codigo && d.ventasReal > 0)
+            .sort((a, b) => b.ventasReal - a.ventasReal);
+
+          if (catRows.length === 0) return null;
+
+          return (
+            <div key={cat.codigo} className="rounded-xl border border-[var(--chs-border)] bg-white shadow-sm overflow-hidden">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-[var(--chs-border-light)]">
+                <span className="text-lg">{cat.icono}</span>
+                <h3 className="text-sm font-semibold text-[var(--chs-text-primary)]">{cat.nombre}</h3>
+                <span className="ml-auto text-sm font-semibold tabular-nums" style={{ color: cat.color }}>
+                  {fmtK(cat.ventasReal)} €
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[var(--chs-bg)]">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">Tienda</th>
+                      <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">Ventas</th>
+                      <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-[var(--chs-text-muted)] uppercase tracking-wider">% del Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {catRows.map((row) => (
+                      <tr key={row.tienda} className="border-t border-[var(--chs-border-light)]">
+                        <td className="px-4 py-2.5 font-medium">{tiendaNames[row.tienda] || row.tienda}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">{fmtK(row.ventasReal)} €</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-[var(--chs-text-muted)]">
+                          {cat.ventasReal > 0 ? ((row.ventasReal / cat.ventasReal) * 100).toFixed(1).replace(".", ",") : "0,0"}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
 
       {/* Heatmap global */}
       {heatmapTiendas.length > 0 && (

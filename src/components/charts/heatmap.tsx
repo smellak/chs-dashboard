@@ -13,22 +13,46 @@ interface HeatmapProps {
   tiendaNames: Record<string, string>;
 }
 
-function getCellColor(pct: number): string {
-  if (pct >= 100) return "var(--chs-success-light)";
-  if (pct >= 90) return "#FEF3C7";
-  if (pct >= 75) return "#FEF3C7";
-  return "var(--chs-error-light)";
-}
-
-function getCellTextColor(pct: number): string {
-  if (pct >= 100) return "var(--chs-success)";
-  if (pct >= 90) return "var(--chs-warning)";
-  return "var(--chs-error)";
+function fmtK(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(".", ",") + "M";
+  if (Math.abs(n) >= 1_000) return (n / 1_000).toFixed(0) + "K";
+  return new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 }).format(n);
 }
 
 export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps) {
+  const hasObjetivos = data.some((d) => d.ventasObjetivo > 0);
   const getCell = (tienda: string, cat: string) =>
     data.find((d) => d.tienda === tienda && d.categoria === cat);
+
+  // Calculate max ventas for relative coloring when no objectives
+  const maxVentas = Math.max(...data.map((d) => d.ventasReal), 1);
+
+  function getCellBg(cell: HeatmapCell | undefined): string {
+    if (!cell || cell.ventasReal <= 0) return "var(--chs-bg)";
+    if (hasObjetivos) {
+      if (cell.pctObjetivo >= 100) return "var(--chs-success-light)";
+      if (cell.pctObjetivo >= 75) return "#FEF3C7";
+      return "var(--chs-error-light)";
+    }
+    // Relative intensity based on sales
+    const intensity = cell.ventasReal / maxVentas;
+    if (intensity > 0.5) return "var(--chs-success-light)";
+    if (intensity > 0.2) return "var(--chs-accent-light)";
+    return "#F1F5F9";
+  }
+
+  function getCellFg(cell: HeatmapCell | undefined): string {
+    if (!cell || cell.ventasReal <= 0) return "var(--chs-text-muted)";
+    if (hasObjetivos) {
+      if (cell.pctObjetivo >= 100) return "var(--chs-success)";
+      if (cell.pctObjetivo >= 75) return "var(--chs-warning)";
+      return "var(--chs-error)";
+    }
+    const intensity = cell.ventasReal / maxVentas;
+    if (intensity > 0.5) return "var(--chs-success)";
+    if (intensity > 0.2) return "var(--chs-accent)";
+    return "var(--chs-text-muted)";
+  }
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[var(--chs-border)] bg-white shadow-sm">
@@ -56,17 +80,20 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
               </td>
               {categorias.map((cat) => {
                 const cell = getCell(tienda, cat);
-                const pct = cell?.pctObjetivo || 0;
                 return (
                   <td key={cat} className="px-4 py-3 text-center">
                     <span
                       className="inline-block rounded-md px-3 py-1.5 text-xs font-semibold tabular-nums"
                       style={{
-                        backgroundColor: getCellColor(pct),
-                        color: getCellTextColor(pct),
+                        backgroundColor: getCellBg(cell),
+                        color: getCellFg(cell),
                       }}
                     >
-                      {pct.toFixed(0)}%
+                      {hasObjetivos
+                        ? `${(cell?.pctObjetivo || 0).toFixed(0)}%`
+                        : cell && cell.ventasReal > 0
+                        ? `${fmtK(cell.ventasReal)} €`
+                        : "—"}
                     </span>
                   </td>
                 );

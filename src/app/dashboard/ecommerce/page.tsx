@@ -42,9 +42,12 @@ export default async function EcommercePage({
 
   const canales = await getDatosCanales(anio, mes);
 
-  const totalReal = canales.reduce((sum, c) => sum + c.ventasReal, 0);
-  const totalObj = canales.reduce((sum, c) => sum + c.ventasObjetivo, 0);
-  const totalAnt = canales.reduce((sum, c) => sum + c.ventasAnterior, 0);
+  // Filter out channels with 0 or negative sales
+  const activeCanales = canales.filter((c) => c.ventasReal > 0);
+
+  const totalReal = activeCanales.reduce((sum, c) => sum + c.ventasReal, 0);
+  const totalObj = activeCanales.reduce((sum, c) => sum + c.ventasObjetivo, 0);
+  const totalAnt = activeCanales.reduce((sum, c) => sum + c.ventasAnterior, 0);
   const hasObjetivos = totalObj > 0;
   const hasAnterior = totalAnt > 0;
 
@@ -54,13 +57,11 @@ export default async function EcommercePage({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div className="lg:col-span-1 flex items-center justify-center">
           <DonutChart
-            segments={canales
-              .filter((c) => c.ventasReal > 0)
-              .map((c) => ({
-                label: c.nombre,
-                value: c.ventasReal,
-                color: CHANNEL_COLORS[c.codigo] || "#94A3B8",
-              }))}
+            segments={activeCanales.map((c) => ({
+              label: c.nombre,
+              value: c.ventasReal,
+              color: CHANNEL_COLORS[c.codigo] || "#94A3B8",
+            }))}
             size={180}
           />
         </div>
@@ -73,13 +74,13 @@ export default async function EcommercePage({
         />
         <KPICard
           label="Canales Activos"
-          value={String(canales.filter(c => c.ventasReal > 0).length)}
-          sub="con ventas este mes"
+          value={String(activeCanales.length)}
+          sub={`de ${canales.length} totales`}
         />
         {hasAnterior && (
           <KPICard
             label="vs Año Anterior"
-            value={fmtEur(totalReal - totalAnt)}
+            value={`${totalReal > totalAnt ? "+" : ""}${fmtK(totalReal - totalAnt)} €`}
             trend={totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : undefined}
             sub={`${fmtK(totalAnt)} € en ${anio - 1}`}
           />
@@ -88,7 +89,7 @@ export default async function EcommercePage({
 
       {/* Channel cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {canales.map((canal) => (
+        {activeCanales.map((canal) => (
           <div
             key={canal.codigo}
             className="rounded-xl border border-[var(--chs-border)] bg-white p-5 shadow-sm"
@@ -105,36 +106,41 @@ export default async function EcommercePage({
               </span>
             </div>
 
-            <div className="kpi-value text-xl tabular-nums text-[var(--chs-text-primary)] mb-1">
+            <div className="kpi-value text-xl tabular-nums text-[var(--chs-text-primary)] mb-2">
               {fmtEur(canal.ventasReal)}
             </div>
 
-            {canal.ventasObjetivo > 0 && (
-              <ProgressBar
-                value={canal.ventasReal}
-                max={canal.ventasObjetivo}
-                color={CHANNEL_COLORS[canal.codigo]}
-              />
-            )}
+            {/* Proportion bar showing share of total */}
+            <div className="mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] text-[var(--chs-text-muted)]">
+                  {totalReal > 0 ? ((canal.ventasReal / totalReal) * 100).toFixed(1).replace(".", ",") : "0,0"}% del total
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${totalReal > 0 ? Math.min((canal.ventasReal / totalReal) * 100, 100) : 0}%`,
+                    backgroundColor: CHANNEL_COLORS[canal.codigo] || "#94A3B8",
+                  }}
+                />
+              </div>
+            </div>
 
             {canal.ventasObjetivo > 0 && (
-              <div className="mt-3 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
+              <div className="flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
                 <span>Obj: {fmtK(canal.ventasObjetivo)} €</span>
                 <DevPill value={canal.pctObjetivo - 100} />
               </div>
             )}
 
             {canal.ventasAnterior > 0 && (
-              <div className="mt-1 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
+              <div className="flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
                 <span>Año ant: {fmtK(canal.ventasAnterior)} €</span>
                 <DevPill value={canal.pctAnterior} />
               </div>
             )}
-
-            {/* Share of total */}
-            <div className="mt-2 text-[11px] text-[var(--chs-text-muted)]">
-              {totalReal > 0 ? ((canal.ventasReal / totalReal) * 100).toFixed(1).replace(".", ",") : "0,0"}% del total digital
-            </div>
           </div>
         ))}
       </div>

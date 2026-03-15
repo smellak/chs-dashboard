@@ -9,6 +9,9 @@ interface StorePoint {
   lng: number;
   ventasReal: number;
   pctObjetivo: number;
+  pctAnterior?: number;
+  hasObjetivos?: boolean;
+  hasAnterior?: boolean;
 }
 
 interface StoreMapProps {
@@ -17,7 +20,6 @@ interface StoreMapProps {
   selected?: string;
 }
 
-// Andalucía bounding box (simplified)
 const BOUNDS = {
   minLat: 36.0,
   maxLat: 38.0,
@@ -29,6 +31,23 @@ function latLngToXY(lat: number, lng: number, width: number, height: number) {
   const x = ((lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * width;
   const y = ((BOUNDS.maxLat - lat) / (BOUNDS.maxLat - BOUNDS.minLat)) * height;
   return { x, y };
+}
+
+function getDotColor(store: StorePoint): string {
+  // If objectives exist, use pctObjetivo
+  if (store.hasObjetivos && store.pctObjetivo > 0) {
+    if (store.pctObjetivo >= 100) return "var(--chs-success)";
+    if (store.pctObjetivo >= 90) return "var(--chs-warning)";
+    return "var(--chs-error)";
+  }
+  // If year-over-year data exists, use pctAnterior
+  if (store.hasAnterior && store.pctAnterior !== undefined) {
+    if (store.pctAnterior >= 0) return "var(--chs-success)";
+    if (store.pctAnterior >= -10) return "var(--chs-warning)";
+    return "var(--chs-error)";
+  }
+  // No comparison data: neutral blue
+  return "var(--chs-accent)";
 }
 
 export function StoreMap({ stores, onSelect, selected }: StoreMapProps) {
@@ -44,24 +63,18 @@ export function StoreMap({ stores, onSelect, selected }: StoreMapProps) {
         className="w-full"
         style={{ maxHeight: 300 }}
       >
-        {/* Simplified Andalucía outline */}
         <path
           d="M 20,200 Q 80,180 120,190 T 200,170 Q 260,150 300,160 T 380,140 Q 420,130 460,150 T 480,180 Q 470,210 440,220 T 360,230 Q 300,240 240,235 T 120,220 Q 60,215 20,200 Z"
           fill="var(--chs-accent-light)"
           stroke="var(--chs-border)"
           strokeWidth="1"
         />
-        {/* Store dots */}
         {stores.map((store) => {
+          if (!store.lat || !store.lng) return null;
           const { x, y } = latLngToXY(store.lat, store.lng, width, height);
           const isActive = selected === store.codigo || hovered === store.codigo;
           const dotSize = isActive ? 10 : 7;
-          const color =
-            store.pctObjetivo >= 100
-              ? "var(--chs-success)"
-              : store.pctObjetivo >= 90
-              ? "var(--chs-warning)"
-              : "var(--chs-error)";
+          const color = getDotColor(store);
 
           return (
             <g

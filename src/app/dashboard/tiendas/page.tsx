@@ -17,7 +17,7 @@ export default async function TiendasPage({
   const mes = params.mes ? Number(params.mes) : defaults.mes;
 
   const tiendas = await getDatosTiendas(anio, mes);
-  const tiendasFisicas = tiendas.filter((t) => t.tipo === "tienda_fisica");
+  const tiendasFisicas = tiendas.filter((t) => t.tipo === "tienda_fisica" && t.ventasReal > 0);
   const hasObjetivos = tiendasFisicas.some((t) => t.ventasObjetivo > 0);
   const hasAnterior = tiendasFisicas.some((t) => t.ventasAnterior > 0);
 
@@ -28,17 +28,18 @@ export default async function TiendasPage({
     lng: t.longitud!,
     ventasReal: t.ventasReal,
     pctObjetivo: t.pctObjetivo,
+    pctAnterior: t.pctAnterior,
+    hasObjetivos,
+    hasAnterior,
   }));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Map */}
         <div className="lg:col-span-2">
           <StoreMap stores={storePoints} />
         </div>
 
-        {/* Store cards */}
         <div className="space-y-3">
           <div className="label-upper">Tiendas Físicas</div>
           {tiendasFisicas.map((t) => (
@@ -76,7 +77,6 @@ export default async function TiendasPage({
         </div>
       </div>
 
-      {/* Full table */}
       <StoreTable stores={tiendas} title="Todas las Tiendas y Canales" />
     </div>
   );

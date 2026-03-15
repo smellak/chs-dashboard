@@ -6,7 +6,7 @@ import { DonutChart } from "@/components/charts/donut-chart";
 import { CategoryCard } from "@/components/data/category-card";
 import { StoreTable } from "@/components/data/store-table";
 import { Heatmap } from "@/components/charts/heatmap";
-import { Euro, BarChart3, Store } from "lucide-react";
+import { BarChart3, Store } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -31,20 +31,21 @@ export default async function DashboardPage({
   const activeCats = categorias.filter((c) => c.ventasReal > 0);
   const totalCatVentas = activeCats.reduce((s, c) => s + c.ventasReal, 0);
 
-  // Mix Categorías: top 3 categories as percentages
-  const catMix = activeCats
-    .sort((a, b) => b.ventasReal - a.ventasReal)
+  // Mix Categorías: top 3
+  const sortedCats = [...activeCats].sort((a, b) => b.ventasReal - a.ventasReal);
+  const catMix = sortedCats
     .slice(0, 3)
     .map((c) => `${c.nombre} ${((c.ventasReal / totalCatVentas) * 100).toFixed(0)}%`)
     .join(" · ");
 
-  // Físicas vs Digital
+  // Físicas vs Digital — as proportion of their own sum
   const ventasFisicas = tiendasFisicas.reduce((s, t) => s + t.ventasReal, 0);
   const ventasDigital = tiendas
     .filter((t) => t.tipo === "ecommerce" || t.tipo === "marketplace")
     .reduce((s, t) => s + t.ventasReal, 0);
-  const pctFisicas = resumen.ventasReal > 0 ? (ventasFisicas / resumen.ventasReal) * 100 : 0;
-  const pctDigital = resumen.ventasReal > 0 ? (ventasDigital / resumen.ventasReal) * 100 : 0;
+  const totalCanales = ventasFisicas + ventasDigital;
+  const pctFisicas = totalCanales > 0 ? (ventasFisicas / totalCanales) * 100 : 0;
+  const pctDigital = totalCanales > 0 ? (ventasDigital / totalCanales) * 100 : 0;
 
   const heatmapTiendas = [...new Set(heatmapData.map((d) => d.tienda))].filter(
     (t) => tiendas.some((s) => s.codigo === t && s.tipo === "tienda_fisica")
@@ -74,15 +75,38 @@ export default async function DashboardPage({
           sub={catMix}
           icon={<BarChart3 size={16} />}
         />
-        <KPICard
-          label="Físicas vs Digital"
-          value={`${pctFisicas.toFixed(0)}% / ${pctDigital.toFixed(0)}%`}
-          sub={`${fmtK(ventasFisicas)} € / ${fmtK(ventasDigital)} €`}
-          icon={<Store size={16} />}
-        />
+        {/* Físicas vs Digital — stacked bar */}
+        <div className="rounded-xl border border-[var(--chs-border)] bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Store size={16} className="text-[var(--chs-accent)]" />
+            <span className="label-upper">Físicas vs Digital</span>
+          </div>
+          <div className="flex h-5 w-full overflow-hidden rounded-full mb-3">
+            <div
+              className="h-full transition-all duration-500"
+              style={{ width: `${pctFisicas}%`, backgroundColor: "#2563EB" }}
+            />
+            <div
+              className="h-full transition-all duration-500"
+              style={{ width: `${pctDigital}%`, backgroundColor: "#8B5CF6" }}
+            />
+          </div>
+          <div className="flex justify-between text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#2563EB" }} />
+              <span className="text-[var(--chs-text-secondary)]">Físicas {pctFisicas.toFixed(0)}%</span>
+              <span className="tabular-nums text-[var(--chs-text-muted)]">{fmtK(ventasFisicas)} €</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#8B5CF6" }} />
+              <span className="text-[var(--chs-text-secondary)]">Digital {pctDigital.toFixed(0)}%</span>
+              <span className="tabular-nums text-[var(--chs-text-muted)]">{fmtK(ventasDigital)} €</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Categorías */}
+      {/* Categorías — balanced grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div className="flex items-center justify-center">
           <DonutChart
@@ -94,17 +118,19 @@ export default async function DashboardPage({
             size={180}
           />
         </div>
-        {activeCats.map((cat) => (
-          <CategoryCard
-            key={cat.codigo}
-            nombre={cat.nombre}
-            icono={cat.icono}
-            color={cat.color}
-            colorLight={cat.colorLight}
-            ventasReal={cat.ventasReal}
-            totalVentas={totalCatVentas}
-          />
-        ))}
+        <div className="lg:col-span-3 grid grid-cols-2 gap-4 md:grid-cols-3">
+          {sortedCats.map((cat) => (
+            <CategoryCard
+              key={cat.codigo}
+              nombre={cat.nombre}
+              icono={cat.icono}
+              color={cat.color}
+              colorLight={cat.colorLight}
+              ventasReal={cat.ventasReal}
+              totalVentas={totalCatVentas}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Tabla de tiendas */}
