@@ -114,7 +114,7 @@ export default async function EcommercePage({
             <div className="mb-2">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[11px] text-[var(--chs-text-muted)]">
-                  {totalReal > 0 ? ((canal.ventasReal / totalReal) * 100).toFixed(1).replace(".", ",") : "0,0"}% del total
+                  {totalReal > 0 ? ((canal.ventasReal / totalReal) * 100).toFixed(1).replace(".", ",") : "0,0"}% del total digital
                 </span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">

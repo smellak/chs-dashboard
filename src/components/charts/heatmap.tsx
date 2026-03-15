@@ -28,7 +28,7 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
   const maxVentas = Math.max(...data.map((d) => d.ventasReal), 1);
 
   function getCellBg(cell: HeatmapCell | undefined): string {
-    if (!cell || cell.ventasReal <= 0) return "var(--chs-bg)";
+    if (!cell || cell.ventasReal < 1) return "var(--chs-bg)";
     if (hasObjetivos) {
       if (cell.pctObjetivo >= 100) return "var(--chs-success-light)";
       if (cell.pctObjetivo >= 75) return "#FEF3C7";
@@ -42,7 +42,7 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
   }
 
   function getCellFg(cell: HeatmapCell | undefined): string {
-    if (!cell || cell.ventasReal <= 0) return "var(--chs-text-muted)";
+    if (!cell || cell.ventasReal < 1) return "var(--chs-text-muted)";
     if (hasObjetivos) {
       if (cell.pctObjetivo >= 100) return "var(--chs-success)";
       if (cell.pctObjetivo >= 75) return "var(--chs-warning)";
@@ -91,7 +91,7 @@ export function Heatmap({ data, tiendas, categorias, tiendaNames }: HeatmapProps
                     >
                       {hasObjetivos
                         ? `${(cell?.pctObjetivo || 0).toFixed(0)}%`
-                        : cell && cell.ventasReal > 0
+                        : cell && cell.ventasReal >= 1
                         ? `${fmtK(cell.ventasReal)} €`
                         : "—"}
                     </span>
