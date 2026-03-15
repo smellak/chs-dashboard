@@ -1,14 +1,10 @@
-import { RadialGauge } from "@/components/charts/radial-gauge";
-
 interface CategoryCardProps {
   nombre: string;
   icono: string;
   color: string;
   colorLight: string;
   ventasReal: number;
-  ventasObjetivo: number;
-  pctObjetivo: number;
-  mbPct: number;
+  totalVentas: number;
   onClick?: () => void;
   active?: boolean;
 }
@@ -25,12 +21,12 @@ export function CategoryCard({
   color,
   colorLight,
   ventasReal,
-  ventasObjetivo,
-  pctObjetivo,
-  mbPct,
+  totalVentas,
   onClick,
   active,
 }: CategoryCardProps) {
+  const pctTotal = totalVentas > 0 ? (ventasReal / totalVentas) * 100 : 0;
+
   return (
     <div
       onClick={onClick}
@@ -51,17 +47,24 @@ export function CategoryCard({
         </span>
         <span className="text-sm font-semibold text-[var(--chs-text-primary)]">{nombre}</span>
       </div>
-      <div className="flex items-center gap-4">
-        <RadialGauge value={pctObjetivo} size={72} strokeWidth={7} />
-        <div>
-          <div className="kpi-value text-xl tabular-nums" style={{ color }}>
-            {fmtK(ventasReal)} €
+      <div>
+        <div className="kpi-value text-xl tabular-nums" style={{ color }}>
+          {fmtK(ventasReal)} €
+        </div>
+        <div className="mt-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] text-[var(--chs-text-muted)]">
+              {pctTotal.toFixed(1).replace(".", ",")}% del total
+            </span>
           </div>
-          <div className="text-[11px] text-[var(--chs-text-muted)]">
-            de {fmtK(ventasObjetivo)} € obj.
-          </div>
-          <div className="mt-1 text-xs font-semibold" style={{ color }}>
-            MB {mbPct.toFixed(1).replace(".", ",")}%
+          <div className="h-2 w-full rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${Math.min(pctTotal, 100)}%`,
+                backgroundColor: color,
+              }}
+            />
           </div>
         </div>
       </div>

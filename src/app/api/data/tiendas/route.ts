@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { getDatosTiendas, getTiendaPorCategoria, getLatestPeriod } from "@/lib/queries/ventas";
+import { getDatosTiendas, getTiendaPorCategoria, getDefaultPeriod } from "@/lib/queries/ventas";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
-  const { anio: defaultAnio, mes: defaultMes } = await getLatestPeriod();
+  const { anio: defaultAnio, mes: defaultMes } = await getDefaultPeriod();
   const anio = Number(params.get("anio") || defaultAnio);
   const mes = Number(params.get("mes") || defaultMes);
   const tienda = params.get("tienda");

@@ -22,7 +22,6 @@ export const NAV_ITEMS = [
   { href: "/dashboard/tiendas", label: "Tiendas", icon: "MapPin" },
   { href: "/dashboard/categorias", label: "Categorías", icon: "Tags" },
   { href: "/dashboard/ecommerce", label: "E-Commerce", icon: "ShoppingCart" },
-  { href: "/dashboard/margenes", label: "Márgenes", icon: "TrendingUp" },
 ] as const;
 
 export const MESES = [

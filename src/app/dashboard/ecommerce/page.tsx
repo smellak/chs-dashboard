@@ -1,5 +1,5 @@
-import { getDatosCanales, getLatestPeriod } from "@/lib/queries/ventas";
-import { fmtK, fmtEur, pct } from "@/lib/format";
+import { getDatosCanales, getDefaultPeriod } from "@/lib/queries/ventas";
+import { fmtK, fmtEur } from "@/lib/format";
 import { DonutChart } from "@/components/charts/donut-chart";
 import { KPICard } from "@/components/kpi/kpi-card";
 import { DevPill } from "@/components/data/dev-pill";
@@ -30,14 +30,23 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   worten: <Store size={16} />,
 };
 
-export default async function EcommercePage() {
-  const { anio, mes } = await getLatestPeriod();
+export default async function EcommercePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const defaults = await getDefaultPeriod();
+  const anio = params.anio ? Number(params.anio) : defaults.anio;
+  const mes = params.mes ? Number(params.mes) : defaults.mes;
+
   const canales = await getDatosCanales(anio, mes);
 
   const totalReal = canales.reduce((sum, c) => sum + c.ventasReal, 0);
   const totalObj = canales.reduce((sum, c) => sum + c.ventasObjetivo, 0);
   const totalAnt = canales.reduce((sum, c) => sum + c.ventasAnterior, 0);
   const hasObjetivos = totalObj > 0;
+  const hasAnterior = totalAnt > 0;
 
   return (
     <div className="space-y-6">
@@ -58,21 +67,23 @@ export default async function EcommercePage() {
         <KPICard
           label="Total E-Commerce"
           value={fmtEur(totalReal)}
-          sub={hasObjetivos ? `Obj: ${fmtK(totalObj)} €` : `Año ant: ${fmtK(totalAnt)} €`}
-          trend={hasObjetivos ? ((totalReal / totalObj) * 100) - 100 : (totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : 0)}
+          sub={hasObjetivos ? `Obj: ${fmtK(totalObj)} €` : hasAnterior ? `Año ant: ${fmtK(totalAnt)} €` : undefined}
+          trend={hasObjetivos ? ((totalReal / totalObj) * 100) - 100 : (hasAnterior && totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : undefined)}
           icon={<ShoppingBag size={16} />}
         />
         <KPICard
-          label={hasObjetivos ? "vs Objetivo" : "Canales Activos"}
-          value={hasObjetivos ? pct((totalReal / totalObj) * 100) : String(canales.filter(c => c.ventasReal > 0).length)}
-          sub={hasObjetivos ? "cumplimiento total" : "con ventas este mes"}
+          label="Canales Activos"
+          value={String(canales.filter(c => c.ventasReal > 0).length)}
+          sub="con ventas este mes"
         />
-        <KPICard
-          label="vs Año Anterior"
-          value={fmtEur(totalReal - totalAnt)}
-          trend={totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : 0}
-          sub={`${fmtK(totalAnt)} € en ${anio - 1}`}
-        />
+        {hasAnterior && (
+          <KPICard
+            label="vs Año Anterior"
+            value={fmtEur(totalReal - totalAnt)}
+            trend={totalAnt > 0 ? ((totalReal - totalAnt) / totalAnt) * 100 : undefined}
+            sub={`${fmtK(totalAnt)} € en ${anio - 1}`}
+          />
+        )}
       </div>
 
       {/* Channel cards */}
@@ -113,9 +124,16 @@ export default async function EcommercePage() {
               </div>
             )}
 
-            <div className="mt-1 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
-              <span>Año ant: {fmtK(canal.ventasAnterior)} €</span>
-              <DevPill value={canal.pctAnterior} />
+            {canal.ventasAnterior > 0 && (
+              <div className="mt-1 flex items-center justify-between text-xs text-[var(--chs-text-muted)]">
+                <span>Año ant: {fmtK(canal.ventasAnterior)} €</span>
+                <DevPill value={canal.pctAnterior} />
+              </div>
+            )}
+
+            {/* Share of total */}
+            <div className="mt-2 text-[11px] text-[var(--chs-text-muted)]">
+              {totalReal > 0 ? ((canal.ventasReal / totalReal) * 100).toFixed(1).replace(".", ",") : "0,0"}% del total digital
             </div>
           </div>
         ))}

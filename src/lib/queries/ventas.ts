@@ -11,6 +11,8 @@ export interface ResumenEmpresa {
   mbPct: number;
   pctObjetivo: number;
   pctAnterior: number;
+  hasAnterior: boolean;
+  hasObjetivos: boolean;
 }
 
 export interface DatosTienda {
@@ -65,16 +67,45 @@ export async function getLatestPeriod(): Promise<{ anio: number; mes: number }> 
   return row ?? { anio: 2025, mes: 1 };
 }
 
+/** Returns the default period: last COMPLETE month (if latest is current month, go back one) */
+export async function getDefaultPeriod(): Promise<{ anio: number; mes: number }> {
+  const latest = await getLatestPeriod();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  if (latest.anio === currentYear && latest.mes === currentMonth) {
+    if (latest.mes === 1) {
+      return { anio: latest.anio - 1, mes: 12 };
+    }
+    return { anio: latest.anio, mes: latest.mes - 1 };
+  }
+
+  return latest;
+}
+
+/** Returns all distinct (anio, mes) with data, ordered desc */
+export async function getAvailablePeriods(): Promise<{ anio: number; mes: number }[]> {
+  const rows = await db.execute<{ anio: number; mes: number }>(sql`
+    SELECT DISTINCT anio, mes
+    FROM erp.ventas_real
+    ORDER BY anio DESC, mes DESC
+  `);
+  return rows;
+}
+
 export async function getResumenEmpresa(anio: number, mes: number): Promise<ResumenEmpresa> {
+  // Sum categories excluding 'anticipos' and 'total' to get the real total
   const [real] = await db.execute<{
     venta_neta: string;
     margen: string;
   }>(sql`
     SELECT
-      COALESCE(venta_neta, 0) as venta_neta,
-      COALESCE(margen, 0) as margen
+      COALESCE(SUM(venta_neta), 0) as venta_neta,
+      COALESCE(SUM(margen), 0) as margen
     FROM erp.ventas_real
-    WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
+    WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa'
+      AND categoria NOT IN ('total', 'anticipos')
   `);
 
   const [objetivo] = await db.execute<{
@@ -82,10 +113,11 @@ export async function getResumenEmpresa(anio: number, mes: number): Promise<Resu
     objetivo_margen: string;
   }>(sql`
     SELECT
-      COALESCE(objetivo_ventas, 0) as objetivo_ventas,
-      COALESCE(objetivo_margen, 0) as objetivo_margen
+      COALESCE(SUM(objetivo_ventas), 0) as objetivo_ventas,
+      COALESCE(SUM(objetivo_margen), 0) as objetivo_margen
     FROM erp.objetivos_direccion
-    WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
+    WHERE anio = ${anio} AND mes = ${mes} AND canal = 'empresa'
+      AND categoria NOT IN ('total', 'anticipos')
   `);
 
   const [anterior] = await db.execute<{
@@ -93,10 +125,17 @@ export async function getResumenEmpresa(anio: number, mes: number): Promise<Resu
     margen: string;
   }>(sql`
     SELECT
-      COALESCE(venta_neta, 0) as venta_neta,
-      COALESCE(margen, 0) as margen
+      COALESCE(SUM(venta_neta), 0) as venta_neta,
+      COALESCE(SUM(margen), 0) as margen
     FROM erp.ventas_real
-    WHERE anio = ${anio - 1} AND mes = ${mes} AND canal = 'empresa' AND categoria = 'total'
+    WHERE anio = ${anio - 1} AND mes = ${mes} AND canal = 'empresa'
+      AND categoria NOT IN ('total', 'anticipos')
+  `);
+
+  // Check if ANY objectives exist for this period
+  const [objCount] = await db.execute<{ cnt: string }>(sql`
+    SELECT COUNT(*)::text as cnt FROM erp.objetivos_direccion
+    WHERE anio = ${anio} AND mes = ${mes}
   `);
 
   const ventasReal = Number(real?.venta_neta || 0);
@@ -105,6 +144,8 @@ export async function getResumenEmpresa(anio: number, mes: number): Promise<Resu
   const margenObjetivo = Number(objetivo?.objetivo_margen || 0);
   const ventasAnterior = Number(anterior?.venta_neta || 0);
   const margenAnterior = Number(anterior?.margen || 0);
+  const hasObjetivos = Number(objCount?.cnt || 0) > 0;
+  const hasAnterior = ventasAnterior !== 0;
 
   return {
     ventasReal,
@@ -116,6 +157,8 @@ export async function getResumenEmpresa(anio: number, mes: number): Promise<Resu
     mbPct: ventasReal > 0 ? (margenReal / ventasReal) * 100 : 0,
     pctObjetivo: ventasObjetivo > 0 ? (ventasReal / ventasObjetivo) * 100 : 0,
     pctAnterior: ventasAnterior > 0 ? ((ventasReal - ventasAnterior) / ventasAnterior) * 100 : 0,
+    hasAnterior,
+    hasObjetivos,
   };
 }
 
@@ -209,6 +252,7 @@ export async function getDatosCategorias(anio: number, mes: number): Promise<Dat
       ON o.canal = 'empresa' AND o.categoria = c.codigo AND o.anio = ${anio} AND o.mes = ${mes}
     LEFT JOIN erp.ventas_real va
       ON va.canal = 'empresa' AND va.categoria = c.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes}
+    WHERE c.codigo != 'anticipos'
     ORDER BY c.orden
   `);
 
@@ -307,6 +351,7 @@ export async function getTiendaPorCategoria(anio: number, mes: number, tiendaCod
       ON o.canal = ${tiendaCodigo} AND o.categoria = c.codigo AND o.anio = ${anio} AND o.mes = ${mes}
     LEFT JOIN erp.ventas_real va
       ON va.canal = ${tiendaCodigo} AND va.categoria = c.codigo AND va.anio = ${anio - 1} AND va.mes = ${mes}
+    WHERE c.codigo != 'anticipos'
     ORDER BY c.orden
   `);
 
@@ -356,7 +401,7 @@ export async function getHeatmapData(anio: number, mes: number): Promise<{
       ON o.canal = v.canal AND o.categoria = v.categoria AND o.anio = v.anio AND o.mes = v.mes
     WHERE v.anio = ${anio} AND v.mes = ${mes}
       AND v.canal != 'empresa'
-      AND v.categoria != 'total'
+      AND v.categoria NOT IN ('total', 'anticipos')
     ORDER BY v.canal, v.categoria
   `);
 

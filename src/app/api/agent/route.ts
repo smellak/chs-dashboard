@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getResumenEmpresa, getDatosTiendas, getDatosCategorias, getLatestPeriod } from "@/lib/queries/ventas";
+import { getResumenEmpresa, getDatosTiendas, getDatosCategorias, getDefaultPeriod } from "@/lib/queries/ventas";
 import { fmtEur, fmtK, pct } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     const body: AgentRequest = await req.json();
     const { capability, parameters } = body;
-    const { anio: defaultAnio, mes: defaultMes } = await getLatestPeriod();
+    const { anio: defaultAnio, mes: defaultMes } = await getDefaultPeriod();
     const anio = parameters.anio || defaultAnio;
     const mes = parameters.mes || defaultMes;
 
@@ -34,35 +34,22 @@ export async function POST(req: NextRequest) {
           }
           const objText = tienda.ventasObjetivo > 0 ? ` (${pct(tienda.pctObjetivo)} del objetivo)` : "";
           return Response.json({
-            text: `${tienda.nombre}: ventas ${fmtEur(tienda.ventasReal)}${objText}. Margen bruto: ${fmtEur(tienda.margenReal)} (MB ${pct(tienda.mbPct)}).`,
+            text: `${tienda.nombre}: ventas ${fmtEur(tienda.ventasReal)}${objText}.`,
             success: true,
             data: tienda,
           });
         }
 
-        const objText = resumen.ventasObjetivo > 0
+        const objText = resumen.hasObjetivos
           ? ` (${pct(resumen.pctObjetivo)} del objetivo de ${fmtEur(resumen.ventasObjetivo)})`
           : "";
+        const yoyText = resumen.hasAnterior
+          ? ` Var. interanual: ${resumen.pctAnterior >= 0 ? "+" : ""}${pct(resumen.pctAnterior)}.`
+          : "";
         return Response.json({
-          text: `Ventas empresa ${mes}/${anio}: ${fmtEur(resumen.ventasReal)}${objText}. Var. interanual: ${resumen.pctAnterior >= 0 ? "+" : ""}${pct(resumen.pctAnterior)}.`,
+          text: `Ventas empresa ${mes}/${anio}: ${fmtEur(resumen.ventasReal)}${objText}.${yoyText}`,
           success: true,
           data: { resumen, tiendas },
-        });
-      }
-
-      case "consultar_margenes": {
-        const resumen = await getResumenEmpresa(anio, mes);
-        const categorias = await getDatosCategorias(anio, mes);
-
-        const catText = categorias
-          .filter((c) => c.ventasReal !== 0)
-          .map((c) => `${c.nombre}: MB ${pct(c.mbPct)} (${fmtK(c.margenReal)} €)`)
-          .join(". ");
-
-        return Response.json({
-          text: `Margen bruto empresa ${mes}/${anio}: ${fmtEur(resumen.margenReal)} (MB ${pct(resumen.mbPct)}). Por categoría: ${catText}.`,
-          success: true,
-          data: { resumen, categorias },
         });
       }
 
@@ -74,12 +61,12 @@ export async function POST(req: NextRequest) {
         const best = sorted[0];
         const worst = sorted[sorted.length - 1];
 
-        const resumen = sorted
-          .map((t, i) => `${i + 1}. ${t.nombre}: ${fmtK(t.ventasReal)} € (MB ${pct(t.mbPct)})`)
+        const resumenText = sorted
+          .map((t, i) => `${i + 1}. ${t.nombre}: ${fmtK(t.ventasReal)} €`)
           .join("\n");
 
         return Response.json({
-          text: `Ranking tiendas ${mes}/${anio}:\n${resumen}\n\nMejor: ${best.nombre} (${fmtK(best.ventasReal)} €). Menor: ${worst.nombre} (${fmtK(worst.ventasReal)} €).`,
+          text: `Ranking tiendas ${mes}/${anio}:\n${resumenText}\n\nMejor: ${best.nombre} (${fmtK(best.ventasReal)} €). Menor: ${worst.nombre} (${fmtK(worst.ventasReal)} €).`,
           success: true,
           data: { ranking: sorted },
         });
@@ -97,22 +84,20 @@ export async function POST(req: NextRequest) {
         const bestCat = activeCats.reduce((a, b) => (a.ventasReal > b.ventasReal ? a : b));
 
         const alerts: string[] = [];
-        if (resumen.ventasObjetivo > 0 && resumen.pctObjetivo < 95) {
+        if (resumen.hasObjetivos && resumen.pctObjetivo < 95) {
           alerts.push(`Ventas por debajo del objetivo (${pct(resumen.pctObjetivo)})`);
         }
-        fisicas.forEach((t) => {
-          if (t.mbPct < 0) alerts.push(`${t.nombre} con margen negativo (${pct(t.mbPct)})`);
-        });
 
-        const objLine = resumen.ventasObjetivo > 0
+        const objLine = resumen.hasObjetivos
           ? `\nOBJETIVO: ${fmtEur(resumen.ventasObjetivo)} (${pct(resumen.pctObjetivo)} cumplimiento)`
+          : "";
+        const yoyLine = resumen.hasAnterior
+          ? `\nYoY: ${resumen.pctAnterior >= 0 ? "+" : ""}${pct(resumen.pctAnterior)} vs ${anio - 1}`
           : "";
 
         const texto = `RESUMEN EJECUTIVO — ${mes}/${anio}
 
-VENTAS: ${fmtEur(resumen.ventasReal)}${objLine}
-MARGEN: ${fmtEur(resumen.margenReal)} (MB ${pct(resumen.mbPct)})
-YoY: ${resumen.pctAnterior >= 0 ? "+" : ""}${pct(resumen.pctAnterior)} vs ${anio - 1}
+VENTAS: ${fmtEur(resumen.ventasReal)}${objLine}${yoyLine}
 
 HIGHLIGHTS:
 - Mayor venta: ${bestStore.nombre} (${fmtK(bestStore.ventasReal)} €)
@@ -130,7 +115,7 @@ ${alerts.length > 0 ? "ALERTAS:\n" + alerts.map((a) => `- ${a}`).join("\n") : "S
 
       default:
         return Response.json({
-          text: `Capability "${capability}" no reconocida. Disponibles: consultar_ventas, consultar_margenes, comparar_tiendas, resumen_ejecutivo.`,
+          text: `Capability "${capability}" no reconocida. Disponibles: consultar_ventas, comparar_tiendas, resumen_ejecutivo.`,
           success: false,
           error: "CAPABILITY_NOT_FOUND",
         });
@@ -147,7 +132,7 @@ ${alerts.length > 0 ? "ALERTAS:\n" + alerts.map((a) => `- ${a}`).join("\n") : "S
 export async function GET() {
   return Response.json({
     name: "Agente Dashboard",
-    description: "Consulta datos de ventas, márgenes y rendimiento del Cuadro de Dirección",
+    description: "Consulta datos de ventas y rendimiento del Cuadro de Dirección",
     capabilities: [
       {
         name: "consultar_ventas",
@@ -158,15 +143,6 @@ export async function GET() {
           mes: { type: "number", description: "Mes (1-12)", optional: true },
           tienda: { type: "string", description: "Código de tienda", optional: true },
           categoria: { type: "string", description: "Código categoría", optional: true },
-        },
-      },
-      {
-        name: "consultar_margenes",
-        description: "Consulta márgenes brutos por tienda o categoría",
-        requiredPermission: "read",
-        parameters: {
-          anio: { type: "number", optional: true },
-          mes: { type: "number", optional: true },
         },
       },
       {

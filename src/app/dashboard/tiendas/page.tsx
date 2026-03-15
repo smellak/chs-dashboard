@@ -1,16 +1,25 @@
-import { getDatosTiendas, getLatestPeriod } from "@/lib/queries/ventas";
-import { fmtK, pct } from "@/lib/format";
+import { getDatosTiendas, getDefaultPeriod } from "@/lib/queries/ventas";
+import { fmtK } from "@/lib/format";
 import { StoreMap } from "@/components/charts/store-map";
 import { StoreTable } from "@/components/data/store-table";
 import { DevPill } from "@/components/data/dev-pill";
 
 export const dynamic = "force-dynamic";
 
-export default async function TiendasPage() {
-  const { anio, mes } = await getLatestPeriod();
-  const tiendas = await getDatosTiendas(anio, mes);
+export default async function TiendasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const defaults = await getDefaultPeriod();
+  const anio = params.anio ? Number(params.anio) : defaults.anio;
+  const mes = params.mes ? Number(params.mes) : defaults.mes;
 
+  const tiendas = await getDatosTiendas(anio, mes);
   const tiendasFisicas = tiendas.filter((t) => t.tipo === "tienda_fisica");
+  const hasObjetivos = tiendasFisicas.some((t) => t.ventasObjetivo > 0);
+  const hasAnterior = tiendasFisicas.some((t) => t.ventasAnterior > 0);
 
   const storePoints = tiendasFisicas.map((t) => ({
     codigo: t.codigo,
@@ -41,24 +50,25 @@ export default async function TiendasPage() {
                 <span className="text-sm font-semibold text-[var(--chs-text-primary)]">
                   {t.nombre}
                 </span>
-                {t.ventasObjetivo > 0 && <DevPill value={t.pctObjetivo - 100} />}
+                {hasObjetivos && t.ventasObjetivo > 0 && <DevPill value={t.pctObjetivo - 100} />}
+                {!hasObjetivos && hasAnterior && t.ventasAnterior > 0 && <DevPill value={t.pctAnterior} />}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 gap-2 text-center">
                 <div>
                   <div className="text-[11px] text-[var(--chs-text-muted)]">Real</div>
                   <div className="text-sm font-semibold tabular-nums">{fmtK(t.ventasReal)} €</div>
                 </div>
                 <div>
                   <div className="text-[11px] text-[var(--chs-text-muted)]">
-                    {t.ventasObjetivo > 0 ? "Objetivo" : "Año Ant."}
+                    {hasObjetivos && t.ventasObjetivo > 0 ? "Objetivo" : hasAnterior && t.ventasAnterior > 0 ? "Año Ant." : "—"}
                   </div>
                   <div className="text-sm tabular-nums text-[var(--chs-text-secondary)]">
-                    {fmtK(t.ventasObjetivo > 0 ? t.ventasObjetivo : t.ventasAnterior)} €
+                    {hasObjetivos && t.ventasObjetivo > 0
+                      ? `${fmtK(t.ventasObjetivo)} €`
+                      : hasAnterior && t.ventasAnterior > 0
+                      ? `${fmtK(t.ventasAnterior)} €`
+                      : "—"}
                   </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[var(--chs-text-muted)]">MB%</div>
-                  <div className="text-sm font-semibold tabular-nums">{pct(t.mbPct)}</div>
                 </div>
               </div>
             </div>
